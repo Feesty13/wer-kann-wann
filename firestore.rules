@@ -1,0 +1,71 @@
+rules_version = '2';
+
+// Zugriffsregeln für "Wer kann wann".
+// - Wer sich registriert, legt seinen eigenen Eintrag an und wartet auf Freischaltung.
+// - Freigeschaltete Personen sehen die ganze Übersicht.
+// - Jeder ändert nur seine eigenen Termine.
+// - Planer (Admins) schalten frei, korrigieren und entfernen Einträge.
+// - Der erste, der sich als Planer einträgt, wird Planer. Danach können nur Planer weitere Planer ernennen.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function rolesPath() {
+      return /databases/$(database)/documents/config/roles;
+    }
+
+    function isAdmin() {
+      return signedIn() && exists(rolesPath())
+        && request.auth.uid in get(rolesPath()).data.admins;
+    }
+
+    function staffPath(uid) {
+      return /databases/$(database)/documents/staff/$(uid);
+    }
+
+    function isApproved() {
+      return isAdmin() || (signedIn() && exists(staffPath(request.auth.uid))
+        && get(staffPath(request.auth.uid)).data.approved == true);
+    }
+
+    function validStaff(d) {
+      return d.keys().hasOnly(['name', 'role', 'items', 'approved', 'plannerOnly', 'updatedAt'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 40
+        && d.role is string && d.role.size() <= 20
+        && d.items is list && d.items.size() <= 300
+        && d.approved is bool
+        && (!('plannerOnly' in d) || d.plannerOnly is bool);
+    }
+
+    match /config/roles {
+      allow read: if signedIn();
+      // Nur möglich, solange noch niemand Planer ist (create = Dokument existiert noch nicht).
+      allow create: if signedIn() && request.resource.data.admins == [request.auth.uid];
+      allow update: if isAdmin()
+        && request.resource.data.admins is list
+        && request.resource.data.admins.size() > 0;
+      allow delete: if false;
+    }
+
+    match /staff/{uid} {
+      allow read: if isApproved() || (signedIn() && request.auth.uid == uid);
+
+      allow create: if signedIn() && validStaff(request.resource.data)
+        && ((request.auth.uid == uid && request.resource.data.approved == false) || isAdmin());
+
+      allow update: if signedIn() && validStaff(request.resource.data)
+        && (isAdmin()
+            || (request.auth.uid == uid && request.resource.data.approved == resource.data.approved));
+
+      allow delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

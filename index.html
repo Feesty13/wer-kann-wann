@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wer kann wann</title>
+<meta name="description" content="Aushilfen tragen ein, wann sie nicht können. Der Dienstplan wird mit einem Blick auf die Woche gemacht.">
+<meta name="theme-color" content="#1f6b4f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Wer kann wann">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: Kopfzeile, Reiter "Woche" (Raster Personen × Mo–Sa), "Meine Termine" (Formular + Liste), "Team" (nur Planer). */
+:root {
+  --bg: #f4f6f3;
+  --surface: #ffffff;
+  --fg: #1b2420;
+  --muted: #5d6b64;
+  --line: #d8dfda;
+  --accent: #1f6b4f;
+  --accent-fg: #ffffff;
+  --accent-soft: #e2efe8;
+  --no: #c23b30;
+  --no-soft: #fbe5e2;
+  --pref: #a86a06;
+  --pref-soft: #fcf0d6;
+  --ok: #2f8a5c;
+  --today: #fff7d1;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121815; --surface: #1a221e; --fg: #e6ece8; --muted: #9aaaa2; --line: #2d3832;
+    --accent: #4fb98a; --accent-fg: #0d1511; --accent-soft: #1d3329;
+    --no: #f07a6e; --no-soft: #3a1f1c; --pref: #e5b04a; --pref-soft: #352a12; --ok: #5cc28c; --today: #2c2a17;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 48px);
+}
+.wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 18px; }
+.stack { display: grid; gap: 14px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: .01em; }
+h1 { font-size: 2rem; line-height: 1.05; }
+h2 { font-size: 1.35rem; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 62ch; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+.who { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .9rem; color: var(--muted); }
+.who b { color: var(--fg); font-weight: 600; }
+
+.banner { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 14px; border-radius: 8px; background: var(--pref-soft); border: 1px solid var(--pref); font-size: .92rem; }
+.banner.info { background: var(--accent-soft); border-color: var(--accent); }
+.banner p { margin: 0; flex: 1 1 260px; }
+
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tab { appearance: none; border: 0; background: none; font: 600 1rem var(--body); color: var(--muted); padding: 10px 14px; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; white-space: nowrap; }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tab .badge { display: inline-block; min-width: 1.4em; padding: 0 5px; margin-left: 4px; border-radius: 999px; background: var(--no); color: #fff; font-size: .75rem; line-height: 1.4em; text-align: center; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+button.btn { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 600 .95rem var(--body); padding: 8px 14px; border-radius: 6px; cursor: pointer; }
+button.btn:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+button.primary:hover { filter: brightness(1.08); border-color: var(--accent); }
+button.ghost { border-color: transparent; background: none; color: var(--muted); padding: 6px 8px; }
+button.ghost:hover { color: var(--fg); }
+button.danger { color: var(--no); }
+button.linkish { appearance: none; border: 0; background: none; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.weeknav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.weeknav .kw { font-family: var(--display); font-size: 1.35rem; font-weight: 700; min-width: 4.5ch; }
+.weeknav .range { color: var(--muted); font-variant-numeric: tabular-nums; }
+.weeknav .spacer { flex: 1; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: .85rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.sw.no { background: var(--no-soft); border: 1.5px solid var(--no); }
+.sw.pref { background: var(--pref-soft); border: 1.5px dashed var(--pref); }
+.sw.free { background: var(--surface); border: 1px solid var(--line); }
+
+.gridbox { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; -webkit-overflow-scrolling: touch; }
+table.grid { border-collapse: collapse; width: 100%; min-width: 640px; font-variant-numeric: tabular-nums; }
+.grid th, .grid td { border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); padding: 8px; vertical-align: top; text-align: left; }
+.grid th:first-child, .grid td:first-child { border-left: 0; position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 110px; }
+.grid thead th { font-weight: 600; font-size: .85rem; color: var(--muted); }
+.grid thead th .d { display: block; font-family: var(--display); font-size: 1.15rem; color: var(--fg); }
+.grid thead th .count { display: block; font-size: .78rem; font-weight: 500; margin-top: 2px; }
+.grid .isToday { background: var(--today); }
+.grid tr.group td { background: var(--bg); font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; padding: 5px 8px; }
+.grid tr:last-child td { border-bottom: 0; }
+.pname { font-weight: 600; }
+.pname small { display: block; font-weight: 400; color: var(--muted); font-size: .78rem; }
+.cell { min-height: 38px; display: grid; gap: 4px; }
+.chip { border-radius: 4px; padding: 3px 6px; font-size: .8rem; line-height: 1.25; }
+.chip.no { background: var(--no-soft); color: var(--no); border: 1.5px solid var(--no); }
+.chip.pref { background: var(--pref-soft); color: var(--pref); border: 1.5px dashed var(--pref); }
+.chip b { font-weight: 600; }
+.chip .n { display: block; color: var(--fg); opacity: .8; font-size: .75rem; overflow-wrap: anywhere; }
+.free { color: var(--ok); font-size: .8rem; }
+.days { display: none; gap: 10px; }
+.day { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; }
+.day.isToday { background: var(--today); }
+.day-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.day-h b { font-family: var(--display); font-size: 1.15rem; }
+.day-h span { font-size: .82rem; color: var(--muted); }
+.day-r { display: flex; gap: 10px; align-items: start; }
+.day-r .who2 { flex: 0 0 34%; font-weight: 600; font-size: .9rem; overflow-wrap: anywhere; }
+.day-r .cell { flex: 1; min-height: 0; }
+.day .rest { font-size: .82rem; color: var(--ok); }
+@media (max-width: 640px) {
+  .gridbox.wide, .weeklist, .gridhint { display: none; }
+  .days { display: grid; }
+}
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+
+form { display: grid; gap: 14px; }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field > label, .lbl { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; color: var(--muted); }
+input[type="text"], input[type="email"], input[type="password"], input[type="date"], input[type="time"], select {
+  font: 500 1rem var(--body); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; min-width: 0; min-height: 40px;
+}
+.check { display: flex; gap: 8px; align-items: start; font-size: .92rem; }
+.check input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; }
+.row > .field { flex: 1 1 140px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: .9rem; font-weight: 500; background: var(--bg); }
+.seg input:checked + label { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg.kind input#k-no:checked + label { background: var(--no); border-color: var(--no); color: #fff; }
+.seg.kind input#k-pref:checked + label { background: var(--pref); border-color: var(--pref); color: #fff; }
+.hint { font-size: .85rem; color: var(--muted); margin: 0; }
+.msg { font-size: .9rem; padding: 8px 10px; border-radius: 6px; background: var(--accent-soft); }
+.msg.err { background: var(--no-soft); color: var(--no); }
+
+.list { list-style: none; margin: 0; padding: 0; display: grid; }
+.list li { display: flex; flex-wrap: wrap; gap: 10px; align-items: start; padding: 10px 0; border-top: 1px solid var(--line); }
+.list li:first-child { border-top: 0; }
+.list .bar { width: 4px; align-self: stretch; border-radius: 2px; background: var(--no); flex: none; }
+.list .bar.pref { background: var(--pref); }
+.list .bar.person { background: var(--accent); }
+.list .bar.wait { background: var(--pref); }
+.list .txt { flex: 1 1 180px; min-width: 0; }
+.list .when { font-weight: 600; font-variant-numeric: tabular-nums; }
+.list .meta { font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; }
+.actions { display: flex; gap: 6px; align-items: center; font-size: .85rem; flex-wrap: wrap; justify-content: end; }
+.tag { display: inline-block; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 1px 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); margin-left: 6px; vertical-align: 2px; }
+
+.empty { text-align: left; padding: 22px 16px; color: var(--muted); display: grid; gap: 10px; justify-items: start; }
+.empty strong { color: var(--fg); font-size: 1.05rem; }
+.status { font-size: .88rem; color: var(--muted); }
+.status.warn { color: var(--pref); }
+.narrow { max-width: 460px; width: 100%; }
+footer { color: var(--muted); font-size: .8rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Wer kann wann</h1>
+      <p class="sub">Tragt hier ein, wann ihr nicht arbeiten könnt. Der Dienstplan wird dann mit einem Blick auf die Woche gemacht, ohne WhatsApp-Verlauf und Zettel.</p>
+    </div>
+    <div class="who" id="who"></div>
+  </header>
+
+  <div id="banner"></div>
+  <div id="statusline" class="status" role="status" hidden></div>
+
+  <nav class="tabs" role="tablist" id="tabs" hidden>
+    <button class="tab" role="tab" id="tab-week" data-tab="week">Wochenübersicht</button>
+    <button class="tab" role="tab" id="tab-mine" data-tab="mine">Meine Termine</button>
+    <button class="tab" role="tab" id="tab-team" data-tab="team" hidden>Team</button>
+  </nav>
+
+  <main id="main" class="stack"></main>
+  <footer id="footer"></footer>
+</div>
+
+<script type="module">
+import { firebaseConfig } from "./config.js";
+
+const DAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+const DAYS_LONG = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+const ROLES = ["Aushilfe", "Teilzeit", "Vollzeit", "Azubi"];
+const LIVE = !!(firebaseConfig && firebaseConfig.apiKey);
+
+/* ================= helpers ================= */
+const $ = id => document.getElementById(id);
+function pad(n) { return String(n).padStart(2, "0"); }
+function ymd(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+function parse(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function mondayOf(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return addDays(x, -((x.getDay() + 6) % 7)); }
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - y0) / 86400000 + 1) / 7);
+}
+function de(d, withYear) { return pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "." + (withYear ? d.getFullYear() : ""); }
+function deS(s, y) { return de(parse(s), y); }
+function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+const todayStr = () => ymd(new Date());
+function timeLabel(it) {
+  if (!it.start && !it.end) return "ganztags";
+  if (it.start && it.end) return it.start + "–" + it.end + " Uhr";
+  if (it.start) return "ab " + it.start + " Uhr";
+  return "bis " + it.end + " Uhr";
+}
+function clean(it) {
+  if (!it || typeof it !== "object") return null;
+  const okDate = s => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const okTime = s => s === "" || (typeof s === "string" && /^\d{2}:\d{2}$/.test(s));
+  const o = {
+    id: String(it.id || ""), kind: it.kind === "pref" ? "pref" : "no", type: it.type === "weekly" ? "weekly" : "once",
+    from: it.from, to: it.to || it.from, until: it.until || "", weekday: Number(it.weekday),
+    start: it.start || "", end: it.end || "", note: typeof it.note === "string" ? it.note.slice(0, 200) : "",
+  };
+  if (!okDate(o.from) || !okDate(o.to) || (o.until && !okDate(o.until)) || !okTime(o.start) || !okTime(o.end)) return null;
+  if (o.type === "weekly" && !(o.weekday >= 0 && o.weekday <= 6)) return null;
+  return o;
+}
+function itemsOf(p) { return p && Array.isArray(p.items) ? p.items.map(clean).filter(Boolean) : []; }
+function hits(it, ds) {
+  if (it.type === "once") return it.from <= ds && ds <= it.to;
+  return parse(ds).getDay() === it.weekday && it.from <= ds && (!it.until || ds <= it.until);
+}
+function describe(it) {
+  if (it.type === "weekly") return "jeden " + DAYS_LONG[it.weekday] + (it.until ? " bis " + deS(it.until, true) : " (ab " + deS(it.from, true) + ")");
+  if (it.from === it.to) return DAYS[parse(it.from).getDay()] + ", " + deS(it.from, true);
+  return DAYS[parse(it.from).getDay()] + " " + deS(it.from, false) + " – " + DAYS[parse(it.to).getDay()] + " " + deS(it.to, true);
+}
+function pruneList(items) {
+  const cut = ymd(addDays(new Date(), -60));
+  return items.filter(it => (it.type === "once" ? it.to : (it.until || "9999")) >= cut);
+}
+function staffBody(d, patch) {
+  // keep only the fields the rules allow
+  const base = {
+    name: String(d.name || "").trim().slice(0, 40),
+    role: ROLES.includes(d.role) ? d.role : "Aushilfe",
+    items: pruneList(itemsOf(d)),
+    approved: d.approved === true,
+    plannerOnly: d.plannerOnly === true,
+  };
+  return { ...base, ...patch, updatedAt: new Date().toISOString() };
+}
+
+/* ================= backends ================= */
+function demoBackend() {
+  const KEY = "wkw-demo-v1";
+  const ME = "demo-du";
+  const subs = new Set();
+  let data = load() || seed();
+
+  function load() { try { const s = localStorage.getItem(KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} }
+  function seed() {
+    const m = ymd(mondayOf(new Date()));
+    const day = n => ymd(addDays(mondayOf(new Date()), n));
+    const p = (name, items, extra) => ({ name, role: "Aushilfe", items, approved: true, plannerOnly: false, updatedAt: new Date().toISOString(), ...extra });
+    return {
+      roles: { admins: [ME] },
+      staff: {
+        [ME]: p("Du (Demo)", [
+          { id: "d1", kind: "no", type: "once", from: day(5), to: day(5), until: "", weekday: 1, start: "", end: "", note: "Familienfeier" },
+        ]),
+        "demo-lena": p("Lena (Beispiel)", [
+          { id: "l1", kind: "no", type: "weekly", from: m, to: m, until: "", weekday: 2, start: "08:00", end: "13:00", note: "Berufsschule" },
+          { id: "l2", kind: "no", type: "weekly", from: m, to: m, until: "", weekday: 4, start: "08:00", end: "13:00", note: "Berufsschule" },
+        ]),
+        "demo-jonas": p("Jonas (Beispiel)", [
+          { id: "j1", kind: "no", type: "once", from: day(9), to: day(12), until: "", weekday: 1, start: "", end: "", note: "Urlaub" },
+          { id: "j2", kind: "no", type: "once", from: day(3), to: day(3), until: "", weekday: 1, start: "", end: "", note: "Klausur" },
+        ]),
+        "demo-mia": p("Mia (Beispiel)", [
+          { id: "m1", kind: "pref", type: "weekly", from: m, to: m, until: "", weekday: 3, start: "16:00", end: "", note: "Training" },
+          { id: "m2", kind: "no", type: "once", from: day(0), to: day(0), until: "", weekday: 1, start: "", end: "12:00", note: "" },
+        ]),
+        "demo-tim": p("Tim (Beispiel)", [], { approved: false }),
+      },
+    };
+  }
+  function emit() { for (const fn of subs) fn(); }
+  const clone = o => JSON.parse(JSON.stringify(o));
+
+  return {
+    demo: true,
+    onAuth(cb) { setTimeout(() => cb({ uid: ME, email: "" }), 0); },
+    watchRoles(cb) { const f = () => cb(clone(data.roles)); subs.add(f); f(); return () => subs.delete(f); },
+    watchOwn(id, cb) { const f = () => cb(data.staff[id] ? clone(data.staff[id]) : null); subs.add(f); f(); return () => subs.delete(f); },
+    watchAll(cb) { const f = () => cb(new Map(Object.entries(clone(data.staff)))); subs.add(f); f(); return () => subs.delete(f); },
+    async setStaff(id, body) { data.staff[id] = clone(body); save(); emit(); },
+    async deleteStaff(id) { delete data.staff[id]; save(); emit(); },
+    async claimAdmin(id) { data.roles = { admins: [id] }; save(); emit(); },
+    async setAdmin(id, on) { const s = new Set(data.roles.admins); on ? s.add(id) : s.delete(id); data.roles.admins = [...s]; save(); emit(); },
+    reset() { data = seed(); save(); emit(); },
+  };
+}
+
+async function liveBackend(cfg) {
+  const V = "10.12.2";
+  const base = "https://www.gstatic.com/firebasejs/" + V + "/";
+  const [appMod, authMod, fsMod] = await Promise.all([
+    import(base + "firebase-app.js"), import(base + "firebase-auth.js"), import(base + "firebase-firestore.js"),
+  ]);
+  const { emulator, ...appCfg } = cfg;
+  const app = appMod.initializeApp(appCfg);
+  const auth = authMod.getAuth(app);
+  auth.languageCode = "de";
+  const db = fsMod.getFirestore(app);
+  if (emulator) { // nur für lokale Tests
+    authMod.connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    fsMod.connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  }
+  const { doc, collection, onSnapshot, setDoc, deleteDoc, updateDoc, arrayUnion, arrayRemove } = fsMod;
+  const roleRef = () => doc(db, "config", "roles");
+  return {
+    demo: false,
+    onAuth(cb) { authMod.onAuthStateChanged(auth, u => cb(u ? { uid: u.uid, email: u.email || "" } : null)); },
+    signIn: (e, p) => authMod.signInWithEmailAndPassword(auth, e, p),
+    signUp: (e, p) => authMod.createUserWithEmailAndPassword(auth, e, p),
+    signOut: () => authMod.signOut(auth),
+    resetPw: e => authMod.sendPasswordResetEmail(auth, e),
+    watchRoles(cb, err) { return onSnapshot(roleRef(), s => cb(s.exists() ? s.data() : null), err); },
+    watchOwn(id, cb, err) { return onSnapshot(doc(db, "staff", id), s => cb(s.exists() ? s.data() : null), err); },
+    watchAll(cb, err) { return onSnapshot(collection(db, "staff"), s => cb(new Map(s.docs.map(d => [d.id, d.data()]))), err); },
+    setStaff: (id, body) => setDoc(doc(db, "staff", id), body),
+    deleteStaff: id => deleteDoc(doc(db, "staff", id)),
+    claimAdmin: id => setDoc(roleRef(), { admins: [id] }),
+    setAdmin: (id, on) => updateDoc(roleRef(), { admins: on ? arrayUnion(id) : arrayRemove(id) }),
+  };
+}
+
+/* ================= state ================= */
+const S = {
+  B: null, auth: "loading", uid: null, email: "",
+  roles: null, rolesLoaded: false, own: null, ownLoaded: false,
+  staff: new Map(), allLoaded: false, unAll: null, unsubs: [],
+  week: mondayOf(new Date()), tab: "week",
+  authMode: "login", authMsg: null, formMsg: null, pendingAction: null,
+  editingName: false, saving: false, resetForm: false, fatal: "",
+};
+const isAdmin = () => !!(S.roles && Array.isArray(S.roles.admins) && S.roles.admins.includes(S.uid));
+const approved = () => isAdmin() || !!(S.own && S.own.approved === true);
+const registered = () => !!(S.own && typeof S.own.name === "string" && S.own.name.trim());
+function people({ all = false } = {}) {
+  const arr = [];
+  for (const [id, d] of S.staff) {
+    if (!d || typeof d.name !== "string" || !d.name.trim()) continue;
+    if (!all && (d.approved !== true || d.plannerOnly === true)) continue;
+    arr.push({ id, name: d.name.trim().slice(0, 40), role: ROLES.includes(d.role) ? d.role : "Aushilfe", items: itemsOf(d), raw: d });
+  }
+  arr.sort((a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role) || a.name.localeCompare(b.name, "de"));
+  return arr;
+}
+const pendingPeople = () => people({ all: true }).filter(p => p.raw.approved !== true);
+
+/* ================= render ================= */
+function render() {
+  renderWho(); renderBanner(); renderStatus();
+  const signedIn = S.auth === "in";
+  const showTabs = signedIn && registered() && !S.editingName;
+  $("tabs").hidden = !showTabs;
+  $("tab-team").hidden = !isAdmin();
+  if (S.tab === "team" && !isAdmin()) S.tab = "week";
+  const pend = isAdmin() ? pendingPeople().length : 0;
+  $("tab-team").innerHTML = "Team" + (pend ? '<span class="badge">' + pend + "</span>" : "");
+  for (const t of document.querySelectorAll(".tab")) t.setAttribute("aria-selected", String(t.dataset.tab === S.tab));
+
+  const main = $("main");
+  const keep = S.resetForm ? null : grabForm(main);
+  S.resetForm = false;
+  let h;
+  if (S.fatal) h = '<div class="panel"><h2>Die Seite konnte nicht starten</h2><p class="hint">' + esc(S.fatal) + "</p></div>";
+  else if (S.auth === "loading") h = '<div class="panel"><p class="hint">Lade …</p></div>';
+  else if (S.auth === "out") h = authView();
+  else if (!S.ownLoaded) h = '<div class="panel"><p class="hint">Lade dein Profil …</p></div>';
+  else if (!registered() || S.editingName) h = onboardView();
+  else if (S.tab === "mine") h = mineView();
+  else if (S.tab === "team") h = teamView();
+  else h = weekView();
+  main.innerHTML = h;
+  bind(main);
+  if (keep) putForm(main, keep);
+  $("footer").textContent = S.B && S.B.demo ? "Demo-Version · Beispieldaten · nichts wird an einen Server geschickt" : "";
+}
+
+function grabForm(root) {
+  const vals = {};
+  root.querySelectorAll("input[id], select[id]").forEach(el => { vals[el.id] = (el.type === "radio" || el.type === "checkbox") ? el.checked : el.value; });
+  const a = document.activeElement;
+  return { vals, focus: a && root.contains(a) ? a.id : null };
+}
+function putForm(root, keep) {
+  for (const [id, v] of Object.entries(keep.vals)) {
+    const el = root.querySelector("#" + CSS.escape(id));
+    if (!el) continue;
+    if (el.type === "radio" || el.type === "checkbox") el.checked = v; else el.value = v;
+  }
+  root.querySelectorAll("form").forEach(f => f.dispatchEvent(new Event("change")));
+  if (keep.focus) { const el = root.querySelector("#" + CSS.escape(keep.focus)); if (el) el.focus(); }
+}
+
+function renderWho() {
+  const el = $("who");
+  if (S.auth !== "in") { el.innerHTML = ""; return; }
+  let h = "";
+  if (registered()) h += "Angemeldet als <b>" + esc(S.own.name) + "</b>" + (isAdmin() ? '<span class="tag">Planer</span>' : "");
+  else if (S.email) h += "Angemeldet als <b>" + esc(S.email) + "</b>";
+  if (S.B && !S.B.demo) h += ' <button class="btn ghost" data-act="signout">Abmelden</button>';
+  el.innerHTML = h;
+  bind(el);
+}
+
+function renderBanner() {
+  const el = $("banner");
+  let h = "";
+  if (S.B && S.B.demo) {
+    h = '<div class="banner"><p><b>Demo mit Beispieldaten.</b> Probier alles aus: Termine eintragen, Wochen blättern, im Reiter „Team“ jemanden freischalten. Was du hier änderst, bleibt nur in diesem Browser.</p>' +
+      '<button class="btn" data-act="demo-reset">Beispieldaten zurücksetzen</button></div>';
+  } else if (S.auth === "in" && S.rolesLoaded && !S.roles && registered()) {
+    h = '<div class="banner info"><p><b>Noch kein Planer festgelegt.</b> Wer diese Seite eingerichtet hat, macht sich hier einmalig zum Planer. Danach kann er andere freischalten und weitere Planer ernennen.</p>' +
+      '<button class="btn primary" data-act="claim">Ich bin der Planer</button></div>';
+  }
+  el.innerHTML = h;
+  bind(el);
+}
+
+function renderStatus() {
+  const el = $("statusline");
+  el.className = "status";
+  el.textContent = S.status || "";
+  if (S.statusWarn) el.className = "status warn";
+  el.hidden = !S.status;
+}
+
+/* ----- auth ----- */
+function authView() {
+  const reg = S.authMode === "register";
+  const reset = S.authMode === "reset";
+  const msg = S.authMsg ? '<div class="msg' + (S.authMsg.err ? " err" : "") + '" role="status">' + esc(S.authMsg.text) + "</div>" : "";
+  if (reset) {
+    return '<div class="panel narrow"><h2>Passwort zurücksetzen</h2>' + msg +
+      '<form id="authform" data-form="reset"><div class="field"><label for="a-email">E-Mail</label><input type="email" id="a-email" autocomplete="email" required></div>' +
+      '<div class="row"><button class="btn primary" type="submit">Link schicken</button><button class="btn ghost" type="button" data-act="mode-login">Zurück zur Anmeldung</button></div></form></div>';
+  }
+  return '<div class="panel narrow"><h2>' + (reg ? "Neu registrieren" : "Anmelden") + "</h2>" +
+    '<p class="hint">' + (reg ? "Nach der Registrierung schaltet dich der Planer frei. Deine eigenen Termine kannst du sofort eintragen." : "Melde dich mit der E-Mail-Adresse an, mit der du dich registriert hast.") + "</p>" + msg +
+    '<form id="authform" data-form="' + (reg ? "register" : "login") + '">' +
+    '<div class="field"><label for="a-email">E-Mail</label><input type="email" id="a-email" autocomplete="email" required></div>' +
+    '<div class="field"><label for="a-pw">Passwort' + (reg ? " (mind. 6 Zeichen)" : "") + '</label><input type="password" id="a-pw" autocomplete="' + (reg ? "new-password" : "current-password") + '" required minlength="6"></div>' +
+    '<div class="row"><button class="btn primary" type="submit"' + (S.saving ? " disabled" : "") + ">" + (reg ? "Registrieren" : "Anmelden") + "</button></div>" +
+    "</form>" +
+    '<p class="hint">' + (reg
+      ? 'Schon registriert? <button class="linkish" data-act="mode-login">Anmelden</button>'
+      : 'Neu hier? <button class="linkish" data-act="mode-register">Registrieren</button> · <button class="linkish" data-act="mode-reset">Passwort vergessen?</button>') + "</p></div>";
+}
+
+/* ----- onboarding ----- */
+function onboardView() {
+  const d = S.own || {};
+  const cur = typeof d.name === "string" ? d.name : "";
+  const role = ROLES.includes(d.role) ? d.role : "Aushilfe";
+  const msg = S.formMsg && S.formMsg.err ? '<div class="msg err">' + esc(S.formMsg.text) + "</div>" : "";
+  return '<div class="panel narrow"><h2>' + (registered() ? "Profil ändern" : "Wer bist du?") + "</h2>" +
+    '<p class="hint">Dein Name erscheint in der Wochenübersicht.' + (registered() ? "" : " Das machst du nur einmal.") + "</p>" + msg +
+    '<form id="nameform"><div class="row">' +
+    '<div class="field"><label for="nm">Name, wie ihn der Chef kennt</label><input type="text" id="nm" maxlength="40" value="' + esc(cur) + '" placeholder="z. B. Samuel" autocomplete="given-name"></div>' +
+    '<div class="field"><label for="rl">Bereich</label><select id="rl">' + ROLES.map(r => "<option" + (r === role ? " selected" : "") + ">" + r + "</option>").join("") + "</select></div></div>" +
+    '<label class="check"><input type="checkbox" id="po"' + (d.plannerOnly ? " checked" : "") + '><span>Ich mache nur den Plan und trage selbst keine Termine ein (z. B. Chef)</span></label>' +
+    '<div class="row"><button class="btn primary" type="submit">' + (registered() ? "Speichern" : "Weiter") + "</button>" +
+    (registered() ? '<button class="btn ghost" type="button" data-act="cancel-name">Abbrechen</button>' : "") + "</div></form></div>";
+}
+
+/* ----- week ----- */
+function weekView() {
+  if (!approved()) {
+    return '<div class="panel"><h2>Warte auf Freischaltung</h2><p class="hint">Der Planer muss dich einmal freischalten. Danach siehst du hier die ganze Woche. Deine eigenen Termine kannst du schon unter „Meine Termine“ eintragen.</p></div>';
+  }
+  const mon = S.week;
+  const days = [0, 1, 2, 3, 4, 5].map(i => addDays(mon, i));
+  const ps = people();
+  const today = todayStr();
+  let h = '<div class="weeknav">' +
+    '<button class="btn" data-act="prev" aria-label="Vorige Woche">‹</button>' +
+    '<span class="kw">KW ' + isoWeek(mon) + "</span>" +
+    '<button class="btn" data-act="next" aria-label="Nächste Woche">›</button>' +
+    '<span class="range">' + de(days[0], false) + " – " + de(days[5], true) + "</span>" +
+    '<span class="spacer"></span>' +
+    (ymd(mon) !== ymd(mondayOf(new Date())) ? '<button class="btn ghost" data-act="thisweek">Diese Woche</button>' : "") +
+    "</div>" +
+    '<div class="legend"><span><i class="sw no"></i>kann nicht</span><span><i class="sw pref"></i>lieber nicht (Wunsch)</span><span><i class="sw free"></i>verfügbar</span></div>';
+
+  if (!S.allLoaded) return h + '<div class="gridbox"><div class="empty"><strong>Lade Einträge …</strong></div></div>';
+  if (!ps.length) {
+    return h + '<div class="gridbox"><div class="empty"><strong>Noch niemand eingetragen</strong>' +
+      "<span>Hier erscheint für jede Person eine Zeile mit Montag bis Samstag. Rote Felder zeigen, wann jemand nicht kann, gelbe sind Wünsche.</span>" +
+      '<button class="btn primary" data-act="tab-mine">Ersten Termin eintragen</button></div></div>';
+  }
+  h += '<div class="gridbox wide"><table class="grid"><thead><tr><th>Name</th>';
+  for (const d of days) {
+    const ds = ymd(d);
+    const blocked = ps.filter(p => p.items.some(it => it.kind === "no" && hits(it, ds) && !it.start && !it.end)).length;
+    const avail = ps.length - blocked;
+    h += '<th class="' + (ds === today ? "isToday" : "") + '">' + DAYS[d.getDay()] + '<span class="d">' + de(d, false) + "</span>" +
+      '<span class="count" style="color:' + (avail === 0 ? "var(--no)" : "var(--muted)") + '">' + avail + " von " + ps.length + " da</span></th>";
+  }
+  h += "</tr></thead><tbody>";
+  const roles = [...new Set(ps.map(p => p.role))];
+  for (const r of roles) {
+    if (roles.length > 1) h += '<tr class="group"><td colspan="7">' + esc(r) + "</td></tr>";
+    for (const p of ps.filter(x => x.role === r)) {
+      h += '<tr><td class="pname">' + esc(p.name) + (p.id === S.uid ? "<small>du</small>" : "") + "</td>";
+      for (const d of days) {
+        const ds = ymd(d);
+        const its = p.items.filter(it => hits(it, ds)).sort((a, b) => (a.kind === "no" ? 0 : 1) - (b.kind === "no" ? 0 : 1) || (a.start || "").localeCompare(b.start || ""));
+        h += '<td class="' + (ds === today ? "isToday" : "") + '"><div class="cell">';
+        if (!its.length) h += '<span class="free" aria-label="verfügbar">✓</span>';
+        for (const it of its) {
+          h += '<div class="chip ' + it.kind + '" title="' + esc((it.kind === "no" ? "Kann nicht" : "Lieber nicht") + ", " + timeLabel(it) + (it.note ? " – " + it.note : "")) + '"><b>' + esc(timeLabel(it)) + "</b>" +
+            (it.type === "weekly" ? " ↻" : "") + (it.note ? '<span class="n">' + esc(it.note) + "</span>" : "") + "</div>";
+        }
+        h += "</div></td>";
+      }
+      h += "</tr>";
+    }
+  }
+  h += "</tbody></table></div>";
+  // phone layout: one card per day
+  h += '<div class="days">' + days.map(d => {
+    const ds = ymd(d);
+    const rowsD = ps.map(p => ({ p, its: p.items.filter(it => hits(it, ds)) })).filter(x => x.its.length);
+    const blocked = rowsD.filter(x => x.its.some(it => it.kind === "no" && !it.start && !it.end)).length;
+    const avail = ps.length - blocked;
+    return '<div class="day' + (ds === today ? " isToday" : "") + '"><div class="day-h"><b>' + DAYS_LONG[d.getDay()] + " " + de(d, false) + "</b>" +
+      '<span style="color:' + (avail === 0 ? "var(--no)" : "var(--muted)") + '">' + avail + " von " + ps.length + " da</span></div>" +
+      rowsD.map(x => '<div class="day-r"><span class="who2">' + esc(x.p.name) + '</span><div class="cell">' + x.its.map(it =>
+        '<div class="chip ' + it.kind + '"><b>' + esc(timeLabel(it)) + "</b>" + (it.type === "weekly" ? " ↻" : "") + (it.note ? '<span class="n">' + esc(it.note) + "</span>" : "") + "</div>").join("") + "</div></div>").join("") +
+      '<span class="rest">' + (rowsD.length ? (rowsD.length < ps.length ? "✓ Alle anderen können" : "") : "✓ Alle können") + "</span></div>";
+  }).join("") + "</div>";
+  h += '<p class="hint gridhint">„X von Y da“ zählt alle, die an dem Tag nicht ganztags gesperrt sind. ↻ = wiederholt sich jede Woche.</p>';
+  const rows = [];
+  for (const p of ps) for (const it of p.items) {
+    const hd = days.filter(d => hits(it, ymd(d)));
+    if (hd.length) rows.push({ p, it, first: ymd(hd[0]) });
+  }
+  rows.sort((a, b) => a.first.localeCompare(b.first) || a.p.name.localeCompare(b.p.name, "de"));
+  if (rows.length) h += '<div class="panel weeklist"><h2>Alle Einträge dieser Woche</h2><ul class="list">' + rows.map(r => entryLi(r.p, r.it, true)).join("") + "</ul></div>";
+  return h;
+}
+
+function canManage(pid) { return pid === S.uid || isAdmin(); }
+function confirmBox(key, label, yes) {
+  return S.pendingAction === key
+    ? '<span class="actions">' + label + ' <button class="btn danger" data-act="do" data-key="' + esc(key) + '">' + yes + '</button><button class="btn ghost" data-act="cancel">Abbrechen</button></span>'
+    : null;
+}
+function entryLi(p, it, showName) {
+  const key = "del|" + p.id + "|" + it.id;
+  let right = "";
+  if (canManage(p.id)) right = confirmBox(key, "Wirklich löschen?", "Löschen") || '<button class="btn ghost danger" data-act="ask" data-key="' + esc(key) + '">Löschen</button>';
+  return '<li><span class="bar ' + it.kind + '"></span><div class="txt">' +
+    '<div class="when">' + (showName ? esc(p.name) + " · " : "") + esc(describe(it)) + "</div>" +
+    '<div class="meta">' + (it.kind === "no" ? "Kann nicht" : "Lieber nicht") + ", " + esc(timeLabel(it)) + (it.note ? " · " + esc(it.note) : "") + "</div>" +
+    "</div>" + right + "</li>";
+}
+
+/* ----- mine ----- */
+function mineView() {
+  const today = todayStr();
+  const settings = '<button class="btn ghost" data-act="edit-name">Profil ändern</button>';
+  if (S.own.plannerOnly) {
+    return '<div class="panel narrow"><h2>Du planst nur</h2><p class="hint">Du bist als Planer ohne eigene Termine eingetragen und erscheinst nicht in der Wochenübersicht.</p><div>' + settings + "</div></div>";
+  }
+  const me = { id: S.uid, name: S.own.name };
+  const mine = itemsOf(S.own).filter(it => (it.type === "once" ? it.to : (it.until || "9999")) >= today)
+    .sort((a, b) => (a.type === b.type ? 0 : a.type === "weekly" ? -1 : 1) || a.from.localeCompare(b.from));
+  const msg = S.formMsg ? '<div class="msg' + (S.formMsg.err ? " err" : "") + '" role="status">' + esc(S.formMsg.text) + "</div>" : "";
+  return '<div class="cols">' +
+    '<div class="panel"><h2>Neuer Termin</h2>' + msg +
+    '<form id="f" novalidate>' +
+      '<div class="field"><span class="lbl">Was</span><div class="seg kind">' +
+        '<input type="radio" name="kind" id="k-no" value="no" checked><label for="k-no">Kann nicht</label>' +
+        '<input type="radio" name="kind" id="k-pref" value="pref"><label for="k-pref">Lieber nicht (Wunsch)</label></div></div>' +
+      '<div class="field"><span class="lbl">Wie oft</span><div class="seg">' +
+        '<input type="radio" name="type" id="t-once" value="once" checked><label for="t-once">Einmalig / Zeitraum</label>' +
+        '<input type="radio" name="type" id="t-weekly" value="weekly"><label for="t-weekly">Jede Woche (z. B. Schule, Uni, Training)</label></div></div>' +
+      '<div class="row" id="onceRow">' +
+        '<div class="field"><label for="from">Von</label><input type="date" id="from" value="' + today + '"></div>' +
+        '<div class="field"><label for="to">Bis (optional)</label><input type="date" id="to"></div></div>' +
+      '<div class="row" id="weeklyRow" hidden>' +
+        '<div class="field"><label for="wd">Wochentag</label><select id="wd">' +
+          [1, 2, 3, 4, 5, 6, 0].map(i => '<option value="' + i + '">' + DAYS_LONG[i] + "</option>").join("") + "</select></div>" +
+        '<div class="field"><label for="wfrom">Ab</label><input type="date" id="wfrom" value="' + today + '"></div>' +
+        '<div class="field"><label for="until">Bis (optional)</label><input type="date" id="until"></div></div>' +
+      '<div class="field"><span class="lbl">Uhrzeit</span><div class="seg">' +
+        '<input type="radio" name="tm" id="tm-all" value="all" checked><label for="tm-all">Ganzer Tag</label>' +
+        '<input type="radio" name="tm" id="tm-am" value="am"><label for="tm-am">Vormittags (bis 13 Uhr)</label>' +
+        '<input type="radio" name="tm" id="tm-pm" value="pm"><label for="tm-pm">Nachmittags (ab 13 Uhr)</label>' +
+        '<input type="radio" name="tm" id="tm-own" value="own"><label for="tm-own">Eigene Zeit</label></div></div>' +
+      '<div class="row" id="ownRow" hidden>' +
+        '<div class="field"><label for="st">Von</label><input type="time" id="st" step="900"></div>' +
+        '<div class="field"><label for="en">Bis</label><input type="time" id="en" step="900"></div></div>' +
+      '<div class="field"><label for="note">Grund (optional, sehen alle)</label><input type="text" id="note" maxlength="120" placeholder="z. B. Klausur, Urlaub, Berufsschule"></div>' +
+      '<div><button class="btn primary" type="submit"' + (S.saving ? " disabled" : "") + ">Eintragen</button></div>" +
+    "</form></div>" +
+    '<div class="panel"><div class="row" style="justify-content:space-between;align-items:center"><h2>Deine kommenden Termine</h2>' + settings + "</div>" +
+      (mine.length ? '<ul class="list">' + mine.map(it => entryLi(me, it, false)).join("") + "</ul>"
+        : '<div class="empty"><strong>Noch nichts eingetragen</strong><span>Alles, was du links einträgst, landet hier und in der Wochenübersicht. Vergangene Termine verschwinden automatisch.</span></div>') +
+    "</div></div>";
+}
+
+/* ----- team (planner only) ----- */
+function teamView() {
+  const all = people({ all: true });
+  const pend = all.filter(p => p.raw.approved !== true);
+  const members = all.filter(p => p.raw.approved === true);
+  const admins = new Set((S.roles && S.roles.admins) || []);
+  const msg = S.formMsg ? '<div class="msg' + (S.formMsg.err ? " err" : "") + '" role="status">' + esc(S.formMsg.text) + "</div>" : "";
+  let h = msg + '<div class="cols"><div class="panel"><h2>Wartet auf Freischaltung</h2>';
+  if (!pend.length) h += '<p class="hint">Niemand wartet. Neue Kollegen registrieren sich selbst über den Link und erscheinen dann hier.</p>';
+  else h += '<ul class="list">' + pend.map(p =>
+    '<li><span class="bar wait"></span><div class="txt"><div class="when">' + esc(p.name) + '</div><div class="meta">' + esc(p.role) + (p.raw.plannerOnly ? " · plant nur" : "") + "</div></div>" +
+    '<span class="actions">' + (confirmBox("reject|" + p.id, "Ablehnen und entfernen?", "Entfernen") ||
+      '<button class="btn primary" data-act="approve" data-id="' + esc(p.id) + '">Freischalten</button><button class="btn ghost danger" data-act="ask" data-key="reject|' + esc(p.id) + '">Ablehnen</button>') + "</span></li>").join("") + "</ul>";
+  h += '</div><div class="panel"><h2>Team</h2><ul class="list">';
+  h += members.map(p => {
+    const isA = admins.has(p.id), self = p.id === S.uid;
+    let act = confirmBox("remove|" + p.id, "Person mit allen Terminen entfernen?", "Entfernen");
+    if (!act) {
+      act = "";
+      if (!self) act += isA ? '<button class="btn ghost" data-act="unadmin" data-id="' + esc(p.id) + '">Planer-Rechte entfernen</button>'
+                            : '<button class="btn ghost" data-act="admin" data-id="' + esc(p.id) + '">Zum Planer machen</button>';
+      if (!self) act += '<button class="btn ghost danger" data-act="ask" data-key="remove|' + esc(p.id) + '">Entfernen</button>';
+    }
+    return '<li><span class="bar person"></span><div class="txt"><div class="when">' + esc(p.name) + (isA ? '<span class="tag">Planer</span>' : "") + (self ? " (du)" : "") +
+      '</div><div class="meta">' + esc(p.role) + (p.raw.plannerOnly ? " · plant nur, keine eigenen Termine" : " · " + p.items.length + " Einträge") + "</div></div>" +
+      '<span class="actions">' + act + "</span></li>";
+  }).join("");
+  h += "</ul><p class=\"hint\">Planer können Leute freischalten, Termine aller Personen löschen und weitere Planer ernennen.</p></div></div>";
+  return h;
+}
+
+/* ================= events ================= */
+function bind(root) {
+  root.querySelectorAll("[data-act]").forEach(b => b.onclick = () => act(b.dataset.act, b.dataset));
+  const f = root.querySelector("#f");
+  if (f) {
+    const sync = () => {
+      const weekly = f.querySelector('input[name="type"]:checked').value === "weekly";
+      $("onceRow").hidden = weekly; $("weeklyRow").hidden = !weekly;
+      $("ownRow").hidden = f.querySelector('input[name="tm"]:checked').value !== "own";
+    };
+    f.addEventListener("change", sync); sync();
+    f.addEventListener("submit", e => { e.preventDefault(); addItem(f); });
+  }
+  const nf = root.querySelector("#nameform");
+  if (nf) nf.addEventListener("submit", e => { e.preventDefault(); saveProfile($("nm").value, $("rl").value, $("po").checked); });
+  const af = root.querySelector("#authform");
+  if (af) af.addEventListener("submit", e => { e.preventDefault(); doAuth(af.dataset.form); });
+}
+
+async function act(a, ds) {
+  switch (a) {
+    case "prev": S.week = addDays(S.week, -7); break;
+    case "next": S.week = addDays(S.week, 7); break;
+    case "thisweek": S.week = mondayOf(new Date()); break;
+    case "tab-mine": S.tab = "mine"; break;
+    case "edit-name": S.editingName = true; S.formMsg = null; break;
+    case "cancel-name": S.editingName = false; S.formMsg = null; break;
+    case "ask": S.pendingAction = ds.key; break;
+    case "cancel": S.pendingAction = null; break;
+    case "do": await doConfirmed(ds.key); return;
+    case "approve": await write(() => S.B.setStaff(ds.id, staffBody(S.staff.get(ds.id), { approved: true })), "Freigeschaltet."); return;
+    case "admin": await write(() => S.B.setAdmin(ds.id, true), "Ist jetzt Planer."); return;
+    case "unadmin": await write(() => S.B.setAdmin(ds.id, false), "Planer-Rechte entfernt."); return;
+    case "claim": await claim(); return;
+    case "demo-reset": S.B.reset(); S.formMsg = null; S.pendingAction = null; S.resetForm = true; break;
+    case "signout": await S.B.signOut(); return;
+    case "mode-login": S.authMode = "login"; S.authMsg = null; break;
+    case "mode-register": S.authMode = "register"; S.authMsg = null; break;
+    case "mode-reset": S.authMode = "reset"; S.authMsg = null; break;
+  }
+  render();
+}
+
+function errText(e) {
+  const c = (e && e.code) || "";
+  if (c === "permission-denied") return "Das darfst du nicht. Vielleicht bist du noch nicht freigeschaltet.";
+  if (c === "unavailable" || c === "auth/network-request-failed") return "Keine Verbindung. Prüf dein Internet und versuch es noch einmal.";
+  return "Das hat nicht geklappt. Versuch es noch einmal.";
+}
+async function write(fn, okText) {
+  try { await fn(); S.formMsg = okText ? { text: okText } : null; return true; }
+  catch (e) { console.error(e); S.formMsg = { err: true, text: errText(e) }; return false; }
+  finally { S.pendingAction = null; render(); }
+}
+
+async function doConfirmed(key) {
+  const [kind, pid, iid] = key.split("|");
+  if (kind === "del") {
+    const d = pid === S.uid ? S.own : S.staff.get(pid);
+    if (!d) return;
+    await write(() => S.B.setStaff(pid, staffBody(d, { items: itemsOf(d).filter(it => it.id !== iid) })), "Gelöscht.");
+  } else if (kind === "reject" || kind === "remove") {
+    await write(() => S.B.deleteStaff(pid), "Entfernt.");
+  }
+}
+
+async function claim() {
+  const ok = await write(() => S.B.claimAdmin(S.uid), "Du bist jetzt Planer.");
+  if (ok && S.own && S.own.approved !== true) await write(() => S.B.setStaff(S.uid, staffBody(S.own, { approved: true })), "Du bist jetzt Planer.");
+}
+
+async function saveProfile(name, role, plannerOnly) {
+  name = (name || "").trim().slice(0, 40);
+  if (!name) { S.formMsg = { err: true, text: "Bitte gib deinen Namen ein." }; render(); return; }
+  const d = S.own || {};
+  const body = staffBody(d, { name, role: ROLES.includes(role) ? role : "Aushilfe", plannerOnly: !!plannerOnly, approved: S.own ? S.own.approved === true : isAdmin() });
+  const ok = await write(() => S.B.setStaff(S.uid, body), null);
+  if (ok) { S.editingName = false; S.resetForm = true; render(); }
+}
+
+async function addItem(f) {
+  if (S.saving) return;
+  const kind = f.querySelector('input[name="kind"]:checked').value;
+  const type = f.querySelector('input[name="type"]:checked').value;
+  const tm = f.querySelector('input[name="tm"]:checked').value;
+  const it = { id: uid(), kind, type, from: "", to: "", until: "", weekday: 1, start: "", end: "", note: $("note").value.trim().slice(0, 120) };
+  const bad = t => { S.formMsg = { err: true, text: t }; render(); };
+  if (type === "once") {
+    it.from = $("from").value; it.to = $("to").value || it.from;
+    if (!it.from) return bad("Bitte wähle ein Datum.");
+    if (it.to < it.from) return bad("„Bis“ liegt vor „Von“. Bitte prüf die Daten.");
+    if (it.to < todayStr()) return bad("Dieser Termin liegt in der Vergangenheit.");
+  } else {
+    it.weekday = Number($("wd").value); it.from = $("wfrom").value || todayStr(); it.to = it.from; it.until = $("until").value;
+    if (it.until && it.until < it.from) return bad("„Bis“ liegt vor „Ab“. Bitte prüf die Daten.");
+  }
+  if (tm === "am") it.end = "13:00";
+  else if (tm === "pm") it.start = "13:00";
+  else if (tm === "own") {
+    it.start = $("st").value; it.end = $("en").value;
+    if (!it.start && !it.end) return bad("Bitte gib mindestens eine Uhrzeit an.");
+    if (it.start && it.end && it.end <= it.start) return bad("Die Endzeit muss nach der Startzeit liegen.");
+  }
+  S.saving = true; render();
+  const ok = await write(() => S.B.setStaff(S.uid, staffBody(S.own, { items: pruneList([...itemsOf(S.own), it]) })),
+    "Eingetragen: " + describe(it) + ", " + timeLabel(it) + ".");
+  S.saving = false;
+  if (ok) { S.resetForm = true; if (type === "once") S.week = mondayOf(parse(it.from)); }
+  render();
+}
+
+async function doAuth(mode) {
+  const email = ($("a-email").value || "").trim();
+  const pw = $("a-pw") ? $("a-pw").value : "";
+  const map = {
+    "auth/invalid-credential": "E-Mail oder Passwort ist falsch.",
+    "auth/wrong-password": "E-Mail oder Passwort ist falsch.",
+    "auth/user-not-found": "E-Mail oder Passwort ist falsch.",
+    "auth/invalid-email": "Diese E-Mail-Adresse ist ungültig.",
+    "auth/email-already-in-use": "Mit dieser E-Mail gibt es schon ein Konto. Melde dich an.",
+    "auth/weak-password": "Das Passwort braucht mindestens 6 Zeichen.",
+    "auth/too-many-requests": "Zu viele Versuche. Warte ein paar Minuten.",
+    "auth/network-request-failed": "Keine Verbindung. Prüf dein Internet.",
+    "auth/missing-email": "Bitte gib deine E-Mail-Adresse ein.",
+  };
+  if (!email) { S.authMsg = { err: true, text: "Bitte gib deine E-Mail-Adresse ein." }; render(); return; }
+  S.saving = true; S.authMsg = null; render();
+  try {
+    if (mode === "reset") {
+      await S.B.resetPw(email);
+      S.authMsg = { text: "Wenn es ein Konto mit dieser E-Mail gibt, kommt gleich ein Link zum Zurücksetzen. Schau auch im Spam-Ordner." };
+      S.authMode = "login";
+    } else if (mode === "register") await S.B.signUp(email, pw);
+    else await S.B.signIn(email, pw);
+  } catch (e) {
+    S.authMsg = { err: true, text: map[e && e.code] || "Das hat nicht geklappt (" + ((e && e.code) || "unbekannt") + ")." };
+  } finally { S.saving = false; render(); }
+}
+
+/* ================= boot ================= */
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => { S.tab = t.dataset.tab; S.formMsg = null; S.pendingAction = null; render(); });
+
+function stopAll() { S.unsubs.forEach(u => { try { u(); } catch (e) {} }); S.unsubs = []; S.unAll = null; }
+function listenErr(e) { console.error(e); if (e && e.code === "permission-denied") return; S.status = "Die Verbindung ist abgebrochen. Lade die Seite neu."; S.statusWarn = true; render(); }
+
+function maybeWatchAll() {
+  if (S.unAll || !approved()) return;
+  const un = S.B.watchAll(map => { S.staff = map; S.allLoaded = true; render(); }, e => {
+    // listener is dead: allow a fresh start on the next profile update (e.g. after approval)
+    S.unsubs = S.unsubs.filter(u => u !== un);
+    if (S.unAll === un) { S.unAll = null; S.allLoaded = false; }
+    listenErr(e);
+  });
+  S.unAll = un;
+  S.unsubs.push(un);
+}
+
+async function boot() {
+  render();
+  try { S.B = LIVE ? await liveBackend(firebaseConfig) : demoBackend(); }
+  catch (e) { console.error(e); S.fatal = "Die Verbindung zu Firebase ließ sich nicht herstellen. Prüf dein Internet und lade die Seite neu."; render(); return; }
+  S.B.onAuth(user => {
+    stopAll();
+    Object.assign(S, { roles: null, rolesLoaded: false, own: null, ownLoaded: false, staff: new Map(), allLoaded: false, formMsg: null, pendingAction: null, editingName: false });
+    if (!user) { if (S.auth === "in") { S.authMode = "login"; S.authMsg = null; } S.auth = "out"; S.uid = null; S.email = ""; render(); return; }
+    S.auth = "in"; S.uid = user.uid; S.email = user.email; S.tab = "week";
+    S.unsubs.push(S.B.watchRoles(r => { S.roles = r; S.rolesLoaded = true; maybeWatchAll(); render(); }, listenErr));
+    S.unsubs.push(S.B.watchOwn(user.uid, d => {
+      const first = !S.ownLoaded;
+      S.own = d; S.ownLoaded = true;
+      if (S.unAll) S.staff.set(user.uid, d);
+      if (first && registered() && !approved()) S.tab = "mine";
+      maybeWatchAll(); render();
+    }, listenErr));
+  });
+}
+boot();
+</script>
+</body>
+</html>
